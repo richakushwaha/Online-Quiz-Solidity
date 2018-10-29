@@ -6,14 +6,15 @@ contract Quiz
     string name;
     
     //number of players that can participate
-    uint numberOfParticipants;
+    uint n;
     uint totalQuestions;
     uint questionRevealed;
     uint participantsRegistered;
     uint participationFee;
     uint tFee;
     bool QAadded;
-
+    bool quizStarted;
+    event printQuestion(string);
     struct Player
     {
         address playerId;
@@ -32,7 +33,7 @@ contract Quiz
     
     modifier checkIfPlayersNotMoreThanN()
     {
-        require ( participantsRegistered <= (numberOfParticipants-1), "No more players can participate");
+        require ( participantsRegistered <= (n-1), "No more players can participate");
         _;
     }
     modifier checkIfMOreThanOnePLayer(uint _n)
@@ -72,7 +73,7 @@ contract Quiz
     }
     modifier gameInitialized()
     {
-        require(QAadded == true, "Game not initialized, cannot register now !!!!");
+        require(QAadded == true, "Game not initialized, cannot register now or unveil questions !!!!");
         _;
     }
     constructor (string _name) public
@@ -80,17 +81,33 @@ contract Quiz
         quizMaster = msg.sender;
         name = _name;
         totalQuestions = 4;
-        numberOfParticipants = 0;
+        n = 0;
         questionRevealed = 0;
         participantsRegistered = 0;
         participationFee = 0;
         tFee = 0;
         QAadded = false;
+        quizStarted = false;
     }
     
-    function initialize_game_by_manager(uint n, string q1, string q2, string q3, string q4, string a1, string a2, string a3, string a4, uint fee) public
+    modifier notAllQuestionsRevealed()
+    {
+        require(questionRevealed <= (totalQuestions-1), "All questions have been revealed");
+        _;
+    }
+    modifier playersMoreThanOne()
+    {
+        require(participantsRegistered >1, "Atleast 2 players required!");
+        _;
+    }
+    modifier checkIfQuizStarted()
+    {
+        require(quizStarted == false, "Game already started hence no more registrations allowed!");
+        _;
+    }
+    function initialize_game_by_manager(uint _n, string q1, string q2, string q3, string q4, string a1, string a2, string a3, string a4, uint fee) public
     onlyQuizMaster()
-    checkIfMOreThanOnePLayer(n)
+    checkIfMOreThanOnePLayer(_n)
     {
 
         questions.push(q1);
@@ -102,13 +119,15 @@ contract Quiz
         answers.push(a2);
         answers.push(a3);
         answers.push(a4);
-        numberOfParticipants = n;
+        n = _n;
         participationFee = fee;
         
         QAadded = true;
+        quizStarted = false;
     }
     
     function registerPlayers(uint initialAccount) public
+    checkIfQuizStarted()
     gameInitialized()
     notQuizMaster()
     notAlreadyRegistered()
@@ -116,8 +135,8 @@ contract Quiz
     checkAccountBalance(initialAccount)
     {
         address temp = quizMaster;
-        uint playersNumber = numberOfParticipants;
-        uint numberOfQuestions = totalQuestions;
+        uint temp2 = n;
+        uint temp3 = totalQuestions;
         
         uint t = participantsRegistered + 1; 
         
@@ -132,8 +151,8 @@ contract Quiz
         participants.push(newPlayer);
         
         quizMaster = temp;
-        numberOfParticipants = playersNumber;
-        totalQuestions = numberOfQuestions;
+        n= temp2;
+        totalQuestions = temp3;
         participantsRegistered = t;
     }
     
@@ -141,7 +160,18 @@ contract Quiz
     {
         return participantsRegistered;
     }
-    
+    function unveilQuestion()
+    onlyQuizMaster()
+    gameInitialized()
+    playersMoreThanOne()
+    notAllQuestionsRevealed() returns (string)
+    {
+        quizStarted = true;
+        uint temp = questionRevealed + 1;
+        
+        questionRevealed = temp;
+        emit printQuestion(questions[temp-1]);
+    }
     function endQuiz()
     onlyQuizMaster()
     allQuestionsRevealed()
