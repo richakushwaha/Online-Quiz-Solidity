@@ -21,6 +21,7 @@ contract Quiz
     bool QAadded;
     bool quizStarted;
     event printQuestion(string);
+    uint maxRewardInQuiz;
     struct Player
     {
         address playerId;
@@ -35,9 +36,11 @@ contract Quiz
     }
     
     string[] questions;
-    string[] answers;
+    string[] correctAnswers;
     Player[] participants;
     mapping (address => uint) participantNumber ;
+    
+    bool evalDone = false;
     
     constructor (string _name) public
     {
@@ -53,6 +56,7 @@ contract Quiz
         tFee = 0;
         QAadded = false;
         quizStarted = false;
+        maxRewardInQuiz = 0;
     }
     
     modifier checkIfPlayersNotMoreThanN()
@@ -134,7 +138,11 @@ contract Quiz
         require( participantIndex.answered == false, "You already submitted answer to this question.");
         _;
     }
-    
+    modifier prevQuestionTimeExceeded()
+    {
+        require(now > answerSubmissionTime, "Cannot unveil next question until previous question is open!");
+        _;
+    }
     function initialize_game_by_manager(uint _n, string q1, string q2, string q3, string q4, string a1, string a2, string a3, string a4, uint fee, uint registrationTimeLimit) public
     onlyQuizMaster()
     checkIfMOreThanOnePLayer(_n)
@@ -145,10 +153,10 @@ contract Quiz
         questions.push(q3);
         questions.push(q4);
         
-        answers.push(a1);
-        answers.push(a2);
-        answers.push(a3);
-        answers.push(a4);
+        correctAnswers.push(a1);
+        correctAnswers.push(a2);
+        correctAnswers.push(a3);
+        correctAnswers.push(a4);
         n = _n;
         participationFee = fee;
         registrationDeadline = now + registrationTimeLimit;
@@ -195,8 +203,13 @@ contract Quiz
     onlyQuizMaster()
     gameInitialized()
     playersMoreThanOne()
+    prevQuestionTimeExceeded()
     notAllQuestionsRevealed() returns (string)
     {
+        for(uint i=0; i<participants.length; i++)
+        {
+            participants[i].answered = false;
+        }
         quizStarted = true;
         uint temp = questionRevealed + 1;
         
@@ -218,7 +231,37 @@ contract Quiz
         participantIndex.answered = true;
         questionRevealed = temp;
     }
-    
+    modifier afterSubmission()
+    {
+        require(now > answerSubmissionTime, "All players not submitted the answer!");
+        _;
+    }
+    function quizEvaluate()
+    onlyQuizMaster()
+    afterSubmission()
+    allQuestionsRevealed()
+    {
+        tFee = tFee*10000;
+        uint maxReward = 0;
+        for(uint i=0; i<participants.length; i++)
+        {
+            for(uint j=0;j<4;j++)
+            {
+                if(keccak256(participants[i].answers[j]) == keccak256(correctAnswers[j]) )
+                {
+                    participants[i].reward = participants[i].reward + 1875 * tFee;
+                    tFee = tFee - 1875 * tFee;
+                }
+            }
+            if(participants[i].reward >= maxReward)
+            {
+                maxReward = participants[i].reward;
+                
+            }
+        }
+        maxRewardInQuiz = maxReward;
+        evalDone = true;
+    }
     function endQuiz()
     onlyQuizMaster()
     allQuestionsRevealed()
@@ -226,6 +269,7 @@ contract Quiz
         tFee = 0;
         questionRevealed = 0;
         participantsRegistered = 0;
+        maxRewardInQuiz = 0;
         
         address playerAddress;
         for(uint i=0; i< participants.length; i++)
@@ -235,12 +279,12 @@ contract Quiz
         }
         delete participants;
         delete questions;
-        delete answers;
+        delete correctAnswers;
     }
     
     function showParticipantsRegistered() view returns (uint)
     {
-        return participantsRegistered;
+        return maxRewardInQuiz;
     }
     
 }
