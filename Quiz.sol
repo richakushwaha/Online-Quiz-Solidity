@@ -203,7 +203,7 @@ contract Quiz
     
     function showParticipantsRegistered() view returns (uint)
     {
-        return now;
+        return participantsRegistered;
     }
     
 }
