@@ -143,6 +143,17 @@ contract Quiz
         require(now > answerSubmissionTime, "Cannot unveil next question until previous question is open!");
         _;
     }
+    modifier afterSubmission()
+    {
+        require(now > answerSubmissionTime, "All players not submitted the answer!");
+        _;
+    }
+    modifier afterEvaluation()
+    {
+        require( evalDone == true, "Quiz is not finished yet.");
+        _;
+    }
+
     function initialize_game_by_manager(uint _n, string q1, string q2, string q3, string q4, string a1, string a2, string a3, string a4, uint fee, uint registrationTimeLimit) public
     onlyQuizMaster()
     checkIfMOreThanOnePLayer(_n)
@@ -231,11 +242,7 @@ contract Quiz
         participantIndex.answered = true;
         questionRevealed = temp;
     }
-    modifier afterSubmission()
-    {
-        require(now > answerSubmissionTime, "All players not submitted the answer!");
-        _;
-    }
+    
     function quizEvaluate()
     onlyQuizMaster()
     afterSubmission()
@@ -262,9 +269,29 @@ contract Quiz
         maxRewardInQuiz = maxReward;
         evalDone = true;
     }
+
+    function getWinner()
+    onlyQuizMaster()
+    afterEvaluation() view returns (address[], uint[])
+    {
+        address[] winnersAddress;
+        uint[] gains;
+        for(uint i = 0; i<participants.length; i++)
+        {
+            Player p = participants[i];
+            uint gain = p.reward;
+            if( gain == maxRewardInQuiz )
+            {
+                winnersAddress.push(p.playerId);
+                gains.push(p.reward);
+            }
+        }
+        
+        return (winnersAddress, gains);
+    }
+
     function endQuiz()
     onlyQuizMaster()
-    allQuestionsRevealed()
     {
         tFee = 0;
         questionRevealed = 0;
