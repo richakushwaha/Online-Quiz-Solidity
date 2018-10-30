@@ -12,6 +12,8 @@ contract Quiz
     uint participantsRegistered;
     uint participationFee;
     uint tFee;
+    uint registrationDeadline;
+    
     bool QAadded;
     bool quizStarted;
     event printQuestion(string);
@@ -31,51 +33,6 @@ contract Quiz
     Player[] participants;
     mapping (address => uint) participantNumber ;
     
-    modifier checkIfPlayersNotMoreThanN()
-    {
-        require ( participantsRegistered <= (n-1), "No more players can participate");
-        _;
-    }
-    modifier checkIfMOreThanOnePLayer(uint _n)
-    {
-        require ( _n > 1 , "Need atleast two players");
-        _;
-    }
-    modifier notQuizMaster()
-    {
-        require ( !(msg.sender == quizMaster) , "Quiz master cannot be a player");
-        _;
-    }
-    modifier notPlayer()
-    {
-        require (participantNumber[msg.sender] > 0 , "Quiz has already initiatized");
-        _;
-    }
-    modifier notAlreadyRegistered()
-    {
-        require ( !(participantNumber[msg.sender] > 0) , "You are already registered in the quiz");
-        _;
-    }
-    modifier checkAccountBalance(uint initialAccount)
-    {
-        require (initialAccount >= participationFee, "You don't have enough balance in your account to participate");
-        _;
-    }
-    modifier onlyQuizMaster()
-    {
-        require(msg.sender == quizMaster, "Only quiz master can start or end the quiz");
-        _;
-    }
-    modifier allQuestionsRevealed()
-    {
-        require(questionRevealed == totalQuestions, "All the questions are not revealed");
-        _;
-    }
-    modifier gameInitialized()
-    {
-        require(QAadded == true, "Game not initialized, cannot register now or unveil questions !!!!");
-        _;
-    }
     constructor (string _name) public
     {
         quizMaster = msg.sender;
@@ -90,9 +47,55 @@ contract Quiz
         quizStarted = false;
     }
     
+    modifier checkIfPlayersNotMoreThanN()
+    {
+        require ( participantsRegistered <= (n-1), "No more players can participate.");
+        _;
+    }
+    modifier checkIfMOreThanOnePLayer(uint _n)
+    {
+        require ( _n > 1 , "Need atleast two players.");
+        _;
+    }
+    modifier notQuizMaster()
+    {
+        require ( !(msg.sender == quizMaster) , "Quiz master cannot be a player.");
+        _;
+    }
+    modifier notPlayer()
+    {
+        require (participantNumber[msg.sender] > 0 , "Quiz has already initiatized.");
+        _;
+    }
+    modifier notAlreadyRegistered()
+    {
+        require ( !(participantNumber[msg.sender] > 0) , "You are already registered in the quiz.");
+        _;
+    }
+    modifier checkAccountBalance(uint initialAccount)
+    {
+        require (initialAccount >= participationFee, "You don't have enough balance in your account to participate.");
+        _;
+    }
+    modifier onlyQuizMaster()
+    {
+        require(msg.sender == quizMaster, "Only quiz master can start or end the quiz.");
+        _;
+    }
+    modifier allQuestionsRevealed()
+    {
+        require(questionRevealed == totalQuestions, "All the questions are not revealed.");
+        _;
+    }
+    modifier gameInitialized()
+    {
+        require(QAadded == true, "Game not initialized, cannot register now or unveil questions !!!!");
+        _;
+    }
+    
     modifier notAllQuestionsRevealed()
     {
-        require(questionRevealed <= (totalQuestions-1), "All questions have been revealed");
+        require(questionRevealed <= (totalQuestions-1), "All questions have been revealed.");
         _;
     }
     modifier playersMoreThanOne()
@@ -100,12 +103,18 @@ contract Quiz
         require(participantsRegistered >1, "Atleast 2 players required!");
         _;
     }
-    modifier checkIfQuizStarted()
+    modifier checkIfQuizCanBeStarted()
     {
-        require(quizStarted == false, "Game already started hence no more registrations allowed!");
+        require(now > registrationDeadline, "Registration is still going on.");
         _;
     }
-    function initialize_game_by_manager(uint _n, string q1, string q2, string q3, string q4, string a1, string a2, string a3, string a4, uint fee) public
+    modifier registrationDeadlineExceeded()
+    {
+        require(now <= registrationDeadline, "Registration is now closed !!");
+        _;
+    }
+    
+    function initialize_game_by_manager(uint _n, string q1, string q2, string q3, string q4, string a1, string a2, string a3, string a4, uint fee, uint registrationTimeLimit) public
     onlyQuizMaster()
     checkIfMOreThanOnePLayer(_n)
     {
@@ -121,14 +130,15 @@ contract Quiz
         answers.push(a4);
         n = _n;
         participationFee = fee;
+        registrationDeadline = now + registrationTimeLimit;
         
         QAadded = true;
         quizStarted = false;
     }
     
     function registerPlayers(uint initialAccount) public
-    checkIfQuizStarted()
     gameInitialized()
+    registrationDeadlineExceeded()
     notQuizMaster()
     notAlreadyRegistered()
     checkIfPlayersNotMoreThanN()
@@ -137,6 +147,7 @@ contract Quiz
         address temp = quizMaster;
         uint temp2 = n;
         uint temp3 = totalQuestions;
+        uint temp4 = registrationDeadline;
         
         uint t = participantsRegistered + 1; 
         
@@ -153,14 +164,12 @@ contract Quiz
         quizMaster = temp;
         n= temp2;
         totalQuestions = temp3;
+        registrationDeadline = temp4;
         participantsRegistered = t;
     }
     
-    function showParticipantsRegistered() view returns (uint)
-    {
-        return participantsRegistered;
-    }
     function unveilQuestion()
+    checkIfQuizCanBeStarted()
     onlyQuizMaster()
     gameInitialized()
     playersMoreThanOne()
@@ -172,6 +181,7 @@ contract Quiz
         questionRevealed = temp;
         emit printQuestion(questions[temp-1]);
     }
+    
     function endQuiz()
     onlyQuizMaster()
     allQuestionsRevealed()
@@ -189,6 +199,11 @@ contract Quiz
         delete participants;
         delete questions;
         delete answers;
+    }
+    
+    function showParticipantsRegistered() view returns (uint)
+    {
+        return now;
     }
     
 }
