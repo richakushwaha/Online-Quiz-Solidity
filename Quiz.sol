@@ -13,6 +13,10 @@ contract Quiz
     uint participationFee;
     uint tFee;
     uint registrationDeadline;
+    uint answerSubmissionTime;
+    
+    string prevAns;
+    event Print(bytes32);
     
     bool QAadded;
     bool quizStarted;
@@ -21,7 +25,9 @@ contract Quiz
     {
         address playerId;
 
-        string[] answers ;
+        //mapping of answers to question number
+        mapping (uint => string) answers;
+        bool answered;
         //account of a player
         uint account;
         //total reward gained in the quiz
@@ -41,6 +47,8 @@ contract Quiz
         n = 0;
         questionRevealed = 0;
         participantsRegistered = 0;
+        registrationDeadline = 0;
+        answerSubmissionTime = 0;
         participationFee = 0;
         tFee = 0;
         QAadded = false;
@@ -79,7 +87,7 @@ contract Quiz
     }
     modifier onlyQuizMaster()
     {
-        require(msg.sender == quizMaster, "Only quiz master can start or end the quiz.");
+        require(msg.sender == quizMaster, "Only quiz master can reveal a question, start or end the quiz.");
         _;
     }
     modifier allQuestionsRevealed()
@@ -111,6 +119,19 @@ contract Quiz
     modifier registrationDeadlineExceeded()
     {
         require(now <= registrationDeadline, "Registration is now closed !!");
+        _;
+    }
+    modifier answerSubmissionTimeExceeded()
+    {
+        require(now <= answerSubmissionTime, "Cannot submit answers anymore !!");
+        _;
+    }
+    modifier answerAlreadySubmitted()
+    {
+        uint index = participantNumber[msg.sender];
+        Player participantIndex = participants[index - 1];
+        
+        require( participantIndex.answered == false, "You already submitted answer to this question.");
         _;
     }
     
@@ -155,6 +176,7 @@ contract Quiz
         
         Player newPlayer;
         newPlayer.playerId = msg.sender;
+        newPlayer.answered = false;
         newPlayer.reward = 0;
         newPlayer.account = initialAccount - participationFee;
         tFee += participationFee;
@@ -179,7 +201,22 @@ contract Quiz
         uint temp = questionRevealed + 1;
         
         questionRevealed = temp;
+        answerSubmissionTime = now + 50;
         emit printQuestion(questions[temp-1]);
+    }
+    
+    function submitAnswers(string ans)
+    notQuizMaster()
+    answerSubmissionTimeExceeded()
+    answerAlreadySubmitted()
+    {
+        uint temp = questionRevealed;
+        uint index = participantNumber[msg.sender];
+        Player participantIndex = participants[index - 1];
+        
+        participantIndex.answers[temp] = ans;
+        participantIndex.answered = true;
+        questionRevealed = temp;
     }
     
     function endQuiz()
