@@ -40,7 +40,8 @@ contract Quiz
     Player[] participants;
     mapping (address => uint) participantNumber ;
     
-    bool evalDone = false;
+    bool evalDone;
+    bool quizEnded;
     
     constructor (string _name) public
     {
@@ -56,6 +57,8 @@ contract Quiz
         tFee = 0;
         QAadded = false;
         quizStarted = false;
+	    evalDone = false;
+	    quizEnded = false;
         maxRewardInQuiz = 0;
     }
     
@@ -153,6 +156,11 @@ contract Quiz
         require( evalDone == true, "Quiz is not finished yet.");
         _;
     }
+    modifier prevQuizEnded()
+    {
+        require(quizEnded == true, "Cannot initialize new quiz until already a quiz is going on!");
+        _;
+    }
 
     function initialize_game_by_manager(uint _n, string q1, string q2, string q3, string q4, string a1, string a2, string a3, string a4, uint fee, uint registrationTimeLimit) public
     onlyQuizMaster()
@@ -174,6 +182,8 @@ contract Quiz
         
         QAadded = true;
         quizStarted = false;
+	    quizEnded = false;
+	    
     }
     
     function registerPlayers(uint initialAccount) public
@@ -297,6 +307,8 @@ contract Quiz
         questionRevealed = 0;
         participantsRegistered = 0;
         maxRewardInQuiz = 0;
+    	evalDone = false;
+    	quizEnded = true;
         
         address playerAddress;
         for(uint i=0; i< participants.length; i++)
@@ -309,9 +321,9 @@ contract Quiz
         delete correctAnswers;
     }
     
-    function showParticipantsRegistered() view returns (uint)
-    {
-        return maxRewardInQuiz;
-    }
+    // function showParticipantsRegistered() view returns (uint)
+    // {
+    //     return maxRewardInQuiz;
+    // }
     
 }
