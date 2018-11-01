@@ -196,7 +196,7 @@ contract Quiz
         QAadded = true;
         quizStarted = false;
         quizEnded = false;
-        tFee = n * fee * 10000;
+        tFee = n * fee;
     }
     
     function registerPlayers(uint initialAccount) public
@@ -309,7 +309,6 @@ contract Quiz
         evalDone = false;
         quizEnded = true;
         n = 0;
-        factor = 16;
         
         address playerAddress;
         for(uint i=0; i< participants.length; i++)
