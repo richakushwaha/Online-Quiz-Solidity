@@ -60,8 +60,8 @@ contract Quiz
         tFee = 0;
         QAadded = false;
         quizStarted = false;
-	    evalDone = false;
-	    quizEnded = false;
+        evalDone = false;
+        quizEnded = false;
         maxRewardInQuiz = 0;
         for(uint i=0;i<4;i++)
         {
@@ -195,8 +195,8 @@ contract Quiz
         
         QAadded = true;
         quizStarted = false;
-	    quizEnded = false;
-	    tFee = n * fee * 10000;
+        quizEnded = false;
+        tFee = n * fee * 10000;
     }
     
     function registerPlayers(uint initialAccount) public
@@ -306,10 +306,10 @@ contract Quiz
         questionRevealed = 0;
         participantsRegistered = 0;
         maxRewardInQuiz = 0;
-    	evalDone = false;
-    	quizEnded = true;
-    	n = 0;
-    	factor = 16;
+        evalDone = false;
+        quizEnded = true;
+        n = 0;
+        factor = 16;
         
         address playerAddress;
         for(uint i=0; i< participants.length; i++)
