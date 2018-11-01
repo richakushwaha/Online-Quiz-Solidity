@@ -3,10 +3,12 @@ pragma solidity ^0.4.0;
 contract Quiz
 {
     address quizMaster;
+    address[] answereSubmittedBy;
     string name;
     
     //number of players that can participate
     uint n;
+    uint factor;
     uint totalQuestions;
     uint questionRevealed;
     uint participantsRegistered;
@@ -21,13 +23,12 @@ contract Quiz
     bool QAadded;
     bool quizStarted;
     event printQuestion(string);
+    event printInt(uint);
     uint maxRewardInQuiz;
     struct Player
     {
         address playerId;
 
-        //mapping of answers to question number
-        mapping (uint => string) answers;
         bool answered;
         //account of a player
         uint account;
@@ -40,7 +41,10 @@ contract Quiz
     Player[] participants;
     mapping (address => uint) participantNumber ;
     
-    bool evalDone = false;
+    bool evalDone;
+    bool quizEnded;
+    bool[] WinnerForThisQuestion;
+    address[] winnersAddress;
     
     constructor (string _name) public
     {
@@ -56,7 +60,13 @@ contract Quiz
         tFee = 0;
         QAadded = false;
         quizStarted = false;
+	    evalDone = false;
+	    quizEnded = false;
         maxRewardInQuiz = 0;
+        for(uint i=0;i<4;i++)
+        {
+            WinnerForThisQuestion.push(false);
+        }
     }
     
     modifier checkIfPlayersNotMoreThanN()
@@ -140,7 +150,7 @@ contract Quiz
     }
     modifier prevQuestionTimeExceeded()
     {
-        require(now > answerSubmissionTime, "Cannot unveil next question until previous question is open!");
+        require(now > answerSubmissionTime , "Cannot unveil next question until previous question is open!");
         _;
     }
     modifier afterSubmission()
@@ -153,7 +163,17 @@ contract Quiz
         require( evalDone == true, "Quiz is not finished yet.");
         _;
     }
-
+    modifier prevQuizEnded()
+    {
+        require(quizEnded == true, "Cannot initialize new quiz until already a quiz is going on!");
+        _;
+    }
+    modifier registered()
+    {
+        require(!(participantNumber[msg.sender] == 0), " You are not registered for this quiz! ");
+        _;
+    }
+    
     function initialize_game_by_manager(uint _n, string q1, string q2, string q3, string q4, string a1, string a2, string a3, string a4, uint fee, uint registrationTimeLimit) public
     onlyQuizMaster()
     checkIfMOreThanOnePLayer(_n)
@@ -169,11 +189,14 @@ contract Quiz
         correctAnswers.push(a3);
         correctAnswers.push(a4);
         n = _n;
+        factor = 16;
         participationFee = fee;
         registrationDeadline = now + registrationTimeLimit;
         
         QAadded = true;
         quizStarted = false;
+	    quizEnded = false;
+	    tFee = n * fee * 10000;
     }
     
     function registerPlayers(uint initialAccount) public
@@ -198,7 +221,6 @@ contract Quiz
         newPlayer.answered = false;
         newPlayer.reward = 0;
         newPlayer.account = initialAccount - participationFee;
-        tFee += participationFee;
         
         participants.push(newPlayer);
         
@@ -225,69 +247,56 @@ contract Quiz
         uint temp = questionRevealed + 1;
         
         questionRevealed = temp;
-        answerSubmissionTime = now + 50;
+        answerSubmissionTime = now + 26;
         emit printQuestion(questions[temp-1]);
     }
     
     function submitAnswers(string ans)
     notQuizMaster()
+    registered()
     answerSubmissionTimeExceeded()
     answerAlreadySubmitted()
     {
         uint temp = questionRevealed;
-        uint index = participantNumber[msg.sender];
-        Player participantIndex = participants[index - 1];
-        
-        participantIndex.answers[temp] = ans;
-        participantIndex.answered = true;
+
+        if((WinnerForThisQuestion[temp - 1] == false) && (keccak256(ans) == keccak256(correctAnswers[temp-1])))
+        {
+            uint temp2 = factor;
+            WinnerForThisQuestion[temp-1] = true;
+            uint currentPlayerIndex = participantNumber[msg.sender] ;
+            participants[currentPlayerIndex-1].reward += (factor * temp2);
+            factor = temp2 - 3;
+            
+            if(participants[currentPlayerIndex-1].reward > maxRewardInQuiz)
+            {
+                maxRewardInQuiz = participants[currentPlayerIndex-1].reward;
+            }
+        }
         questionRevealed = temp;
     }
-    
+
     function quizEvaluate()
     onlyQuizMaster()
     afterSubmission()
     allQuestionsRevealed()
     {
-        tFee = tFee*10000;
-        uint maxReward = 0;
-        for(uint i=0; i<participants.length; i++)
+
+        for(uint i = 0; i<participants.length; i++)
         {
-            for(uint j=0;j<4;j++)
+            Player p = participants[i];
+            if( p.reward == maxRewardInQuiz )
             {
-                if(keccak256(participants[i].answers[j]) == keccak256(correctAnswers[j]) )
-                {
-                    participants[i].reward = participants[i].reward + 1875 * tFee;
-                    tFee = tFee - 1875 * tFee;
-                }
-            }
-            if(participants[i].reward >= maxReward)
-            {
-                maxReward = participants[i].reward;
-                
+                winnersAddress.push(p.playerId);
             }
         }
-        maxRewardInQuiz = maxReward;
         evalDone = true;
     }
 
     function getWinner()
     onlyQuizMaster()
-    afterEvaluation() view returns (address[], uint[])
+    afterEvaluation() view returns (address[])
     {
-        address[] winnersAddress;
-        uint[] gains;
-        for(uint i = 0; i<participants.length; i++)
-        {
-            Player p = participants[i];
-            uint gain = p.reward;
-            if( gain == maxRewardInQuiz )
-            {
-                winnersAddress.push(p.playerId);
-                gains.push(p.reward);
-            }
-        }
-        
-        return (winnersAddress, gains);
+        return (winnersAddress);
     }
 
     function endQuiz()
@@ -297,6 +306,10 @@ contract Quiz
         questionRevealed = 0;
         participantsRegistered = 0;
         maxRewardInQuiz = 0;
+    	evalDone = false;
+    	quizEnded = true;
+    	n = 0;
+    	factor = 16;
         
         address playerAddress;
         for(uint i=0; i< participants.length; i++)
@@ -304,14 +317,14 @@ contract Quiz
             playerAddress = participants[i].playerId;
             delete participantNumber[playerAddress];
         }
+        for(uint j=0;j<4;j++)
+        {
+            WinnerForThisQuestion[j] = false;
+        }
         delete participants;
         delete questions;
         delete correctAnswers;
+        delete WinnerForThisQuestion;
+        delete winnersAddress;
     }
-    
-    function showParticipantsRegistered() view returns (uint)
-    {
-        return maxRewardInQuiz;
-    }
-    
 }
