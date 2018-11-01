@@ -3,6 +3,7 @@ pragma solidity ^0.4.0;
 contract Quiz
 {
     address quizMaster;
+    address[] answereSubmittedBy;
     string name;
     
     //number of players that can participate
@@ -21,13 +22,14 @@ contract Quiz
     bool QAadded;
     bool quizStarted;
     event printQuestion(string);
+    event printInt(uint);
     uint maxRewardInQuiz;
     struct Player
     {
         address playerId;
 
         //mapping of answers to question number
-        mapping (uint => string) answers;
+        // mapping (uint => string) answers;
         bool answered;
         //account of a player
         uint account;
@@ -42,6 +44,8 @@ contract Quiz
     
     bool evalDone;
     bool quizEnded;
+    mapping ( uint => address) firstSubmission;
+    bool[] WinnerForThisQuestion;
     
     constructor (string _name) public
     {
@@ -60,6 +64,10 @@ contract Quiz
 	    evalDone = false;
 	    quizEnded = false;
         maxRewardInQuiz = 0;
+        for(uint i=0;i<4;i++)
+        {
+            WinnerForThisQuestion.push(false);
+        }
     }
     
     modifier checkIfPlayersNotMoreThanN()
@@ -143,7 +151,7 @@ contract Quiz
     }
     modifier prevQuestionTimeExceeded()
     {
-        require(now > answerSubmissionTime, "Cannot unveil next question until previous question is open!");
+        require(now > answerSubmissionTime || WinnerForThisQuestion[questionRevealed-1] == false, "Cannot unveil next question until previous question is open!");
         _;
     }
     modifier afterSubmission()
@@ -161,7 +169,6 @@ contract Quiz
         require(quizEnded == true, "Cannot initialize new quiz until already a quiz is going on!");
         _;
     }
-
     function initialize_game_by_manager(uint _n, string q1, string q2, string q3, string q4, string a1, string a2, string a3, string a4, uint fee, uint registrationTimeLimit) public
     onlyQuizMaster()
     checkIfMOreThanOnePLayer(_n)
@@ -183,7 +190,7 @@ contract Quiz
         QAadded = true;
         quizStarted = false;
 	    quizEnded = false;
-	    
+	    tFee = n * fee * 10000;
     }
     
     function registerPlayers(uint initialAccount) public
@@ -208,7 +215,6 @@ contract Quiz
         newPlayer.answered = false;
         newPlayer.reward = 0;
         newPlayer.account = initialAccount - participationFee;
-        tFee += participationFee;
         
         participants.push(newPlayer);
         
@@ -235,22 +241,43 @@ contract Quiz
         uint temp = questionRevealed + 1;
         
         questionRevealed = temp;
-        answerSubmissionTime = now + 50;
+        answerSubmissionTime = now + 26;
         emit printQuestion(questions[temp-1]);
     }
-    
+    modifier winnerNotAldreadyDeclared()
+    {
+        require(WinnerForThisQuestion[questionRevealed] == false, " ");
+        _;
+    }
+    // modifier registered()
+    // {
+    //     require(!(participantNumber[msg.sender] == 0), " You are not registered for this quiz! ");
+    //     _;
+    // }
     function submitAnswers(string ans)
     notQuizMaster()
     answerSubmissionTimeExceeded()
     answerAlreadySubmitted()
+    // winnerNotAldreadyDeclared()
+    // registered()
     {
-        uint temp = questionRevealed;
-        uint index = participantNumber[msg.sender];
-        Player participantIndex = participants[index - 1];
+        // firstSubmission[questionRevealed] = msg.sender;
+        if(keccak256(ans) == keccak256(correctAnswers[questionRevealed-1]))
+        {
+            emit printInt(questionRevealed);
+            firstSubmission[questionRevealed] = msg.sender;
+            WinnerForThisQuestion[questionRevealed-1] = true;
+            uint currentPlayerIndex = participantNumber[msg.sender] ;
+            participants[currentPlayerIndex-1].reward += 1875 * tFee;
+            tFee = tFee - 1875 * tFee;
+        }
+        // uint temp = questionRevealed;
+        // uint index = participantNumber[msg.sender];
+        // Player participantIndex = participants[index - 1];
         
-        participantIndex.answers[temp] = ans;
-        participantIndex.answered = true;
-        questionRevealed = temp;
+        // participantIndex.answers[temp] = ans;
+        // participantIndex.answered = true;
+        // questionRevealed = temp;
     }
     
     function quizEvaluate()
@@ -258,22 +285,13 @@ contract Quiz
     afterSubmission()
     allQuestionsRevealed()
     {
-        tFee = tFee*10000;
+        // tFee = tFee*10000;
         uint maxReward = 0;
         for(uint i=0; i<participants.length; i++)
         {
-            for(uint j=0;j<4;j++)
-            {
-                if(keccak256(participants[i].answers[j]) == keccak256(correctAnswers[j]) )
-                {
-                    participants[i].reward = participants[i].reward + 1875 * tFee;
-                    tFee = tFee - 1875 * tFee;
-                }
-            }
             if(participants[i].reward >= maxReward)
             {
                 maxReward = participants[i].reward;
-                
             }
         }
         maxRewardInQuiz = maxReward;
@@ -282,22 +300,21 @@ contract Quiz
 
     function getWinner()
     onlyQuizMaster()
-    afterEvaluation() view returns (address[], uint[])
+    afterEvaluation() view returns (address, uint)
     {
         address[] winnersAddress;
         uint[] gains;
         for(uint i = 0; i<participants.length; i++)
         {
             Player p = participants[i];
-            uint gain = p.reward;
-            if( gain == maxRewardInQuiz )
+            // uint gain = p.reward;
+            if( p.reward == maxRewardInQuiz )
             {
                 winnersAddress.push(p.playerId);
                 gains.push(p.reward);
             }
         }
-        
-        return (winnersAddress, gains);
+        return (winnersAddress[0], gains[0]);
     }
 
     function endQuiz()
@@ -316,9 +333,14 @@ contract Quiz
             playerAddress = participants[i].playerId;
             delete participantNumber[playerAddress];
         }
+        for(uint j=0;j<4;j++)
+        {
+            WinnerForThisQuestion[j] = false;
+        }
         delete participants;
         delete questions;
         delete correctAnswers;
+        delete WinnerForThisQuestion;
     }
     
     // function showParticipantsRegistered() view returns (uint)
