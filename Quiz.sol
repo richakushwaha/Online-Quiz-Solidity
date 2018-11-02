@@ -326,4 +326,7 @@ contract Quiz
         delete WinnerForThisQuestion;
         delete winnersAddress;
     }
+    function getBalance(address addr) returns(uint){
+        return participants[participantNumber[addr]].account;
+    }
 }
